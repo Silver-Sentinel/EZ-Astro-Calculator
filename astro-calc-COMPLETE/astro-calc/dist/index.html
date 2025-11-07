@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astro Calculator - Fagan-Bradley Sidereal</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .app-header {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+        }
+        
+        .app-header h1 {
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+        
+        .main-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-size: 16px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+        }
+        
+        .tab:hover { background: #e9ecef; }
+        .tab.active { background: white; color: #667eea; border-bottom: 3px solid #667eea; }
+        
+        .content-wrapper {
+            display: flex;
+            height: calc(100vh - 200px);
+            min-height: 600px;
+        }
+        
+        .input-panel {
+            width: 40%;
+            padding: 30px;
+            background: #f5f5f5;
+            overflow-y: auto;
+            border-right: 2px solid #e0e0e0;
+        }
+        
+        .output-panel {
+            width: 60%;
+            padding: 30px;
+            background: white;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .person-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .person-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
+        .form-group { flex: 1; position: relative; }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        input[type="date"],
+        input[type="time"],
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .gender-options { display: flex; gap: 15px; margin-top: 5px; }
+        .gender-options label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: normal;
+            cursor: pointer;
+        }
+        
+        .hint-text { font-size: 12px; color: #999; margin-top: 3px; }
+        
+        .location-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .dropdown-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .dropdown-item:hover { background: #f8f9fa; }
+        
+        .calculate-btn {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .calculate-btn:hover { background: #5568d3; }
+        
+        #outputText {
+            flex: 1;
+            width: 100%;
+            min-height: 400px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            resize: both;
+            overflow: auto;
+            background: #fafafa;
+        }
+        
+        .copy-btn {
+            margin-top: 15px;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .copy-btn:hover { background: #5568d3; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .disabled-field { background: #e9ecef !important; cursor: not-allowed !important; }
+        
+        .footer {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            margin: 0 10px;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .batch-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .batch-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .file-upload-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .file-upload-btn:hover {
+            background: #5568d3;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .batch-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f0f8ff;
+            border-left: 4px solid #667eea;
+            font-size: 13px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-header">
+        <h1>🌟 Astrological Chart Calculator</h1>
+        <p class="subtitle">Fagan-Bradley Sidereal • Placidus Houses</p>
+    </div>
+
+    <div class="main-container">
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('natal')">📊 Natal Chart</button>
+            <button class="tab" onclick="switchTab('synastry')">💑 Synastry</button>
+            <button class="tab" onclick="switchTab('transits')">🔄 Transits</button>
+        </div>
+
+        <div class="content-wrapper">
+            <div class="input-panel">
+                <!-- NATAL TAB -->
+                <div id="natal-inputs" class="tab-content active">
+                    <div class="person-section">
+                        <h3>Person 1</h3>
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="natal-p1-name" placeholder="Enter name">
+                        </div>
+                        <div class="form-group">
+                            <label>Gender</label>
+                            <div class="gender-options">
+                                <label><input type="radio" name="natal-p1-gender" value="Male" checked> Male</label>
+                                <label><input type="radio" name="natal-p1-gender" value="Female"> Female</label>
+                                <label><input type="radio" name="natal-p1-gender" value="Other"> Other</label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Birth Date</label>
+                                <input type="date" id="natal-p1-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Birth Time</label>
+                                <input type="time" id="natal-p1-time">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="natal-p1-timezone" placeholder="-05:00">
+                            <p class="hint-text">Format: +/-HH:MM (e.g., -05:00 for EST)</p>
+                        </div>
+                        <div class="form-group">
+                            <label>Search Location 🔍</label>
+                            <input type="text" id="natal-p1-location-search" placeholder="Type city name...">
+                            <div id="natal-p1-location-dropdown" class="location-dropdown"></div>
+                            <p class="hint-text">Or enter coordinates manually below</p>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Latitude</label>
+                                <input type="number" id="natal-p1-lat" step="any" placeholder="40.7128">
+                            </div>
+                            <div class="form-group">
+                                <label>Longitude</label>
+                                <input type="number" id="natal-p1-lon" step="any" placeholder="-74.0060">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="person-section">
+                        <h3>Person 2</h3>
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="natal-p2-name" placeholder="Enter name">
+                        </div>
+                        <div class="form-group">
+                            <label>Gender</label>
+                            <div class="gender-options">
+                                <label><input type="radio" name="natal-p2-gender" value="Male"> Male</label>
+                                <label><input type="radio" name="natal-p2-gender" value="Female" checked> Female</label>
+                                <label><input type="radio" name="natal-p2-gender" value="Other"> Other</label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Birth Date</label>
+                                <input type="date" id="natal-p2-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Birth Time</label>
+                                <input type="time" id="natal-p2-time">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="natal-p2-timezone" placeholder="-05:00">
+                        </div>
+                        <div class="form-group">
+                            <label>Search Location 🔍</label>
+                            <input type="text" id="natal-p2-location-search" placeholder="Type city name...">
+                            <div id="natal-p2-location-dropdown" class="location-dropdown"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Latitude</label>
+                                <input type="number" id="natal-p2-lat" step="any">
+                            </div>
+                            <div class="form-group">
+                                <label>Longitude</label>
+                                <input type="number" id="natal-p2-lon" step="any">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="calculate-btn" onclick="calculateNatal()">Calculate Charts</button>
+                    
+                    <!-- Batch Import Section -->
+                    <div class="batch-section" style="margin-top: 20px;">
+                        <h3>📄 Batch Import (TXT File)</h3>
+                        <label for="fileInput" class="file-upload-btn">Choose TXT File</label>
+                        <input type="file" id="fileInput" accept=".txt" onchange="handleFileUpload(event)">
+                        <div class="batch-info">
+                            <strong>Format:</strong> Name,Gender,YYYY-MM-DD,HH:MM,Timezone,Lat,Lon<br>
+                            <strong>Example:</strong> John Doe,Male,1990-03-21,14:30,-05:00,40.7128,-74.0060
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SYNASTRY TAB -->
+                <div id="synastry-inputs" class="tab-content">
+                    <div class="person-section">
+                        <h3>Person 1</h3>
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="syn-p1-name" placeholder="Enter name">
+                        </div>
+                        <div class="form-group">
+                            <label>Gender</label>
+                            <div class="gender-options">
+                                <label><input type="radio" name="syn-p1-gender" value="Male" checked> Male</label>
+                                <label><input type="radio" name="syn-p1-gender" value="Female"> Female</label>
+                                <label><input type="radio" name="syn-p1-gender" value="Other"> Other</label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Birth Date</label>
+                                <input type="date" id="syn-p1-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Birth Time</label>
+                                <input type="time" id="syn-p1-time">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="syn-p1-timezone" placeholder="-05:00">
+                        </div>
+                        <div class="form-group">
+                            <label>Search Location 🔍</label>
+                            <input type="text" id="syn-p1-location-search" placeholder="Type city name...">
+                            <div id="syn-p1-location-dropdown" class="location-dropdown"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Latitude</label>
+                                <input type="number" id="syn-p1-lat" step="any">
+                            </div>
+                            <div class="form-group">
+                                <label>Longitude</label>
+                                <input type="number" id="syn-p1-lon" step="any">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="person-section">
+                        <h3>Person 2</h3>
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="syn-p2-name" placeholder="Enter name">
+                        </div>
+                        <div class="form-group">
+                            <label>Gender</label>
+                            <div class="gender-options">
+                                <label><input type="radio" name="syn-p2-gender" value="Male"> Male</label>
+                                <label><input type="radio" name="syn-p2-gender" value="Female" checked> Female</label>
+                                <label><input type="radio" name="syn-p2-gender" value="Other"> Other</label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Birth Date</label>
+                                <input type="date" id="syn-p2-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Birth Time</label>
+                                <input type="time" id="syn-p2-time">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="syn-p2-timezone" placeholder="-05:00">
+                        </div>
+                        <div class="form-group">
+                            <label>Search Location 🔍</label>
+                            <input type="text" id="syn-p2-location-search" placeholder="Type city name...">
+                            <div id="syn-p2-location-dropdown" class="location-dropdown"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Latitude</label>
+                                <input type="number" id="syn-p2-lat" step="any">
+                            </div>
+                            <div class="form-group">
+                                <label>Longitude</label>
+                                <input type="number" id="syn-p2-lon" step="any">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="calculate-btn" onclick="calculateSynastry()">Calculate Synastry</button>
+                </div>
+
+                <!-- TRANSITS TAB -->
+                <div id="transits-inputs" class="tab-content">
+                    <div class="person-section">
+                        <h3>Natal Person</h3>
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="trans-p1-name" placeholder="Enter name">
+                        </div>
+                        <div class="form-group">
+                            <label>Gender</label>
+                            <div class="gender-options">
+                                <label><input type="radio" name="trans-p1-gender" value="Male" checked> Male</label>
+                                <label><input type="radio" name="trans-p1-gender" value="Female"> Female</label>
+                                <label><input type="radio" name="trans-p1-gender" value="Other"> Other</label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Birth Date</label>
+                                <input type="date" id="trans-p1-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Birth Time</label>
+                                <input type="time" id="trans-p1-time">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="trans-p1-timezone" placeholder="-05:00">
+                        </div>
+                        <div class="form-group">
+                            <label>Search Location 🔍</label>
+                            <input type="text" id="trans-p1-location-search" placeholder="Type city name...">
+                            <div id="trans-p1-location-dropdown" class="location-dropdown"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Latitude</label>
+                                <input type="number" id="trans-p1-lat" step="any">
+                            </div>
+                            <div class="form-group">
+                                <label>Longitude</label>
+                                <input type="number" id="trans-p1-lon" step="any">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="person-section">
+                        <h3>Transit Date</h3>
+                        <div class="form-group">
+                            <label>Name (disabled)</label>
+                            <input type="text" class="disabled-field" disabled>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Date</label>
+                                <input type="date" id="trans-p2-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Time</label>
+                                <input type="time" id="trans-p2-time">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="trans-p2-timezone" placeholder="-05:00">
+                        </div>
+                    </div>
+
+                    <button class="calculate-btn" onclick="calculateTransits()">Calculate Transits</button>
+                </div>
+            </div>
+
+            <div class="output-panel">
+                <textarea id="outputText" readonly placeholder="Chart output will appear here..."></textarea>
+                <button class="copy-btn" onclick="copyToClipboard()">📋 Copy to Clipboard</button>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            Made by <a href="https://www.x.com/@AquarianRising0" target="_blank">Aquarian Rising</a> | 
+            <a href="https://www.youtube.com/@Aquarian_Rising" target="_blank">YouTube Channel</a>
+        </div>
+    </div>
+
+    <script>
+        // Wait for Tauri to be ready before accessing invoke
+        let invoke;
+        
+        // Initialize when DOM and Tauri are ready
+        async function initializeApp() {
+            // Wait for Tauri API to be available
+            if (window.__TAURI__ && window.__TAURI__.core) {
+                invoke = window.__TAURI__.core.invoke;
+                console.log('Tauri API loaded successfully');
+            } else {
+                console.error('Tauri API not available!');
+                return;
+            }
+            
+            // Setup location search for all fields
+            ['natal-p1', 'natal-p2', 'syn-p1', 'syn-p2', 'trans-p1'].forEach(prefix => {
+                setupLocationSearch(prefix);
+            });
+            
+            console.log('App initialized successfully');
+        }
+
+        let searchTimeout;
+        let locationCache = {}; // Store search results per prefix
+        let selectedIndex = {}; // Track selected item in dropdown
+
+        function setupLocationSearch(prefix) {
+            const searchInput = document.getElementById(`${prefix}-location-search`);
+            const dropdown = document.getElementById(`${prefix}-location-dropdown`);
+            
+            if (!searchInput) return;
+
+            // Initialize tracking
+            locationCache[prefix] = [];
+            selectedIndex[prefix] = 0;
+
+            // Handle text input
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                const query = e.target.value;
+                
+                if (query.length < 2) {
+                    dropdown.style.display = 'none';
+                    locationCache[prefix] = [];
+                    return;
+                }
+                
+                searchTimeout = setTimeout(async () => {
+                    try {
+                        console.log('Searching for:', query);
+                        const result = await invoke('search_location', { query });
+                        console.log('Search results:', result);
+                        
+                        if (result.error) {
+                            console.error('API Error:', result.error);
+                            dropdown.innerHTML = `<div class="dropdown-item">Error: ${result.error}</div>`;
+                            dropdown.style.display = 'block';
+                            return;
+                        }
+                        
+                        locationCache[prefix] = result.results;
+                        selectedIndex[prefix] = 0;
+                        showLocationResults(result.results, prefix);
+                        
+                        // Auto-fill with first result
+                        if (result.results.length > 0) {
+                            console.log('Auto-filling with:', result.results[0].name);
+                            autoFillFirstResult(searchInput, query, result.results[0], prefix);
+                        }
+                    } catch (error) {
+                        console.error('Location search failed:', error);
+                        dropdown.innerHTML = `<div class="dropdown-item">Search failed. Check console for details.</div>`;
+                        dropdown.style.display = 'block';
+                    }
+                }, 300);
+            });
+
+            // Handle keyboard navigation
+            searchInput.addEventListener('keydown', (e) => {
+                const results = locationCache[prefix];
+                if (!results || results.length === 0) return;
+
+                switch(e.key) {
+                    case 'Enter':
+                        e.preventDefault();
+                        if (results[selectedIndex[prefix]]) {
+                            selectLocation(results[selectedIndex[prefix]], prefix);
+                        }
+                        break;
+                    
+                    case 'Tab':
+                        e.preventDefault();
+                        if (results[selectedIndex[prefix]]) {
+                            selectLocation(results[selectedIndex[prefix]], prefix);
+                        }
+                        break;
+                    
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        selectedIndex[prefix] = Math.min(selectedIndex[prefix] + 1, results.length - 1);
+                        highlightSelectedItem(prefix);
+                        break;
+                    
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        selectedIndex[prefix] = Math.max(selectedIndex[prefix] - 1, 0);
+                        highlightSelectedItem(prefix);
+                        break;
+                    
+                    case 'Escape':
+                        dropdown.style.display = 'none';
+                        searchInput.value = '';
+                        locationCache[prefix] = [];
+                        break;
+                }
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.style.display = 'none';
+                }
+            });
+        }
+
+        function autoFillFirstResult(input, userQuery, firstResult, prefix) {
+            if (!firstResult) {
+                console.log('No result to auto-fill');
+                return;
+            }
+            
+            const suggestion = `${firstResult.name}, ${firstResult.admin1 ? firstResult.admin1 + ', ' : ''}${firstResult.country}`;
+            console.log('Attempting auto-fill:', userQuery, '->', suggestion);
+            
+            // Only auto-fill if suggestion starts with user's query (case-insensitive)
+            if (suggestion.toLowerCase().startsWith(userQuery.toLowerCase())) {
+                const currentPos = input.selectionStart;
+                const oldValue = input.value;
+                input.value = suggestion;
+                
+                try {
+                    // Select the auto-filled portion
+                    input.setSelectionRange(userQuery.length, suggestion.length);
+                    console.log('Auto-fill successful! Selected text:', suggestion.substring(userQuery.length));
+                } catch (e) {
+                    console.error('Text selection failed:', e);
+                    console.log('Auto-fill text added, but selection not working');
+                }
+            } else {
+                console.log('Suggestion does not start with query, skipping auto-fill');
+            }
+        }
+
+        function highlightSelectedItem(prefix) {
+            const dropdown = document.getElementById(`${prefix}-location-dropdown`);
+            const items = dropdown.getElementsByClassName('dropdown-item');
+            
+            // Remove highlight from all items
+            for (let item of items) {
+                item.style.backgroundColor = '';
+            }
+            
+            // Highlight selected item
+            if (items[selectedIndex[prefix]]) {
+                items[selectedIndex[prefix]].style.backgroundColor = '#e9ecef';
+                items[selectedIndex[prefix]].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function showLocationResults(results, prefix) {
+            const dropdown = document.getElementById(`${prefix}-location-dropdown`);
+            dropdown.innerHTML = '';
+            
+            if (results.length === 0) {
+                dropdown.innerHTML = '<div class="dropdown-item">No results found</div>';
+            } else {
+                results.forEach((loc, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'dropdown-item';
+                    item.textContent = `${loc.name}, ${loc.admin1 ? loc.admin1 + ', ' : ''}${loc.country}`;
+                    item.onclick = () => selectLocation(loc, prefix);
+                    
+                    // Highlight first item by default
+                    if (index === 0) {
+                        item.style.backgroundColor = '#e9ecef';
+                    }
+                    
+                    dropdown.appendChild(item);
+                });
+            }
+            
+            dropdown.style.display = 'block';
+        }
+
+        function selectLocation(loc, prefix) {
+            const searchInput = document.getElementById(`${prefix}-location-search`);
+            const dropdown = document.getElementById(`${prefix}-location-dropdown`);
+            
+            // Fill in the coordinates
+            document.getElementById(`${prefix}-lat`).value = loc.latitude;
+            document.getElementById(`${prefix}-lon`).value = loc.longitude;
+            
+            // Show the selected location in the search field
+            searchInput.value = `${loc.name}, ${loc.admin1 ? loc.admin1 + ', ' : ''}${loc.country}`;
+            
+            // Hide dropdown and clear cache
+            dropdown.style.display = 'none';
+            locationCache[prefix] = [];
+            
+            // Visual feedback
+            searchInput.style.backgroundColor = '#e8f5e9';
+            setTimeout(() => {
+                searchInput.style.backgroundColor = '';
+            }, 1000);
+        }
+
+        function buildDatetime(date, time, timezone) {
+            return `${date}T${time}:00${timezone}`;
+        }
+
+        async function calculateNatal() {
+            try {
+                const request = {
+                    person1: {
+                        name: document.getElementById('natal-p1-name').value || 'Person 1',
+                        gender: document.querySelector('input[name="natal-p1-gender"]:checked').value,
+                        datetime: buildDatetime(
+                            document.getElementById('natal-p1-date').value,
+                            document.getElementById('natal-p1-time').value,
+                            document.getElementById('natal-p1-timezone').value
+                        ),
+                        latitude: parseFloat(document.getElementById('natal-p1-lat').value),
+                        longitude: parseFloat(document.getElementById('natal-p1-lon').value)
+                    },
+                    person2: {
+                        name: document.getElementById('natal-p2-name').value || 'Person 2',
+                        gender: document.querySelector('input[name="natal-p2-gender"]:checked').value,
+                        datetime: buildDatetime(
+                            document.getElementById('natal-p2-date').value,
+                            document.getElementById('natal-p2-time').value,
+                            document.getElementById('natal-p2-timezone').value
+                        ),
+                        latitude: parseFloat(document.getElementById('natal-p2-lat').value),
+                        longitude: parseFloat(document.getElementById('natal-p2-lon').value)
+                    }
+                };
+
+                const result = await invoke('calculate_dual_natal', request);
+                document.getElementById('outputText').value = result.output || result.error;
+            } catch (error) {
+                document.getElementById('outputText').value = `Error: ${error}`;
+            }
+        }
+
+        async function calculateSynastry() {
+            try {
+                const request = {
+                    person1: {
+                        name: document.getElementById('syn-p1-name').value || 'Person 1',
+                        gender: document.querySelector('input[name="syn-p1-gender"]:checked').value,
+                        datetime: buildDatetime(
+                            document.getElementById('syn-p1-date').value,
+                            document.getElementById('syn-p1-time').value,
+                            document.getElementById('syn-p1-timezone').value
+                        ),
+                        latitude: parseFloat(document.getElementById('syn-p1-lat').value),
+                        longitude: parseFloat(document.getElementById('syn-p1-lon').value)
+                    },
+                    person2: {
+                        name: document.getElementById('syn-p2-name').value || 'Person 2',
+                        gender: document.querySelector('input[name="syn-p2-gender"]:checked').value,
+                        datetime: buildDatetime(
+                            document.getElementById('syn-p2-date').value,
+                            document.getElementById('syn-p2-time').value,
+                            document.getElementById('syn-p2-timezone').value
+                        ),
+                        latitude: parseFloat(document.getElementById('syn-p2-lat').value),
+                        longitude: parseFloat(document.getElementById('syn-p2-lon').value)
+                    }
+                };
+
+                const result = await invoke('calculate_synastry', request);
+                document.getElementById('outputText').value = result.output || result.error;
+            } catch (error) {
+                document.getElementById('outputText').value = `Error: ${error}`;
+            }
+        }
+
+        async function calculateTransits() {
+            try {
+                const request = {
+                    natal_person: {
+                        name: document.getElementById('trans-p1-name').value || 'Person',
+                        gender: document.querySelector('input[name="trans-p1-gender"]:checked').value,
+                        datetime: buildDatetime(
+                            document.getElementById('trans-p1-date').value,
+                            document.getElementById('trans-p1-time').value,
+                            document.getElementById('trans-p1-timezone').value
+                        ),
+                        latitude: parseFloat(document.getElementById('trans-p1-lat').value),
+                        longitude: parseFloat(document.getElementById('trans-p1-lon').value)
+                    },
+                    transit_datetime: buildDatetime(
+                        document.getElementById('trans-p2-date').value,
+                        document.getElementById('trans-p2-time').value,
+                        document.getElementById('trans-p2-timezone').value
+                    )
+                };
+
+                const result = await invoke('calculate_transits', request);
+                document.getElementById('outputText').value = result.output || result.error;
+            } catch (error) {
+                document.getElementById('outputText').value = `Error: ${error}`;
+            }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(tabName + '-inputs').classList.add('active');
+            
+            document.getElementById('outputText').value = '';
+        }
+
+        function copyToClipboard() {
+            const output = document.getElementById('outputText');
+            output.select();
+            document.execCommand('copy');
+            
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => btn.textContent = originalText, 2000);
+        }
+
+        window.addEventListener('DOMContentLoaded', initializeApp);
+        
+        // Batch file import handler
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const text = await file.text();
+            const lines = text.split('\n').filter(line => line.trim());
+            
+            let output = '═══════════════════════════════════════\n';
+            output += `BATCH CALCULATION: ${lines.length} Charts\n`;
+            output += '═══════════════════════════════════════\n\n';
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                const parts = line.split(',').map(p => p.trim());
+                
+                if (parts.length !== 7) {
+                    output += `ERROR Line ${i+1}: Invalid format (need 7 fields)\n\n`;
+                    continue;
+                }
+                
+                const [name, gender, date, time, timezone, lat, lon] = parts;
+                
+                try {
+                    const request = {
+                        person1: {
+                            name: name || `Person ${i+1}`,
+                            gender: gender || 'Other',
+                            datetime: `${date}T${time}:00${timezone}`,
+                            latitude: parseFloat(lat),
+                            longitude: parseFloat(lon)
+                        },
+                        person2: {
+                            name: 'Placeholder',
+                            gender: 'Other',
+                            datetime: `${date}T${time}:00${timezone}`,
+                            latitude: parseFloat(lat),
+                            longitude: parseFloat(lon)
+                        }
+                    };
+                    
+                    const result = await invoke('calculate_dual_natal', request);
+                    
+                    if (result.success && result.output) {
+                        // Extract only the first person's chart by parsing carefully
+                        const sections = result.output.split('═══════════════════════════════════════');
+                        
+                        // Find the first chart section (should be after the first separator)
+                        let chartStart = false;
+                        let chartLines = [];
+                        
+                        for (let section of sections) {
+                            const trimmed = section.trim();
+                            if (!trimmed) continue;
+                            
+                            // Skip header sections
+                            if (trimmed.includes('DUAL NATAL CHART')) continue;
+                            
+                            // Take the first non-header section
+                            if (!chartStart) {
+                                chartLines.push(trimmed);
+                                chartStart = true;
+                                break;
+                            }
+                        }
+                        
+                        const firstChart = chartLines.join('\n');
+                        output += `${i+1}. ${name}\n${firstChart}\n\n`;
+                    } else {
+                        output += `${i+1}. ${name} - ERROR: ${result.error}\n\n`;
+                    }
+                } catch (error) {
+                    output += `${i+1}. ${name} - ERROR: ${error}\n\n`;
+                }
+            }
+            
+            output += '═══════════════════════════════════════\n';
+            output += 'BATCH CALCULATION COMPLETE\n';
+            output += '═══════════════════════════════════════\n';
+            
+            document.getElementById('outputText').value = output;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# Astrological Calculator Configuration
+
+[ephemeris]
+# Path to Swiss Ephemeris data files
+# Update this to point to your ephemeris data directory
+path = "/usr/local/share/sweph"
+
+# Alternative paths for different systems:
+# Windows: "C:/swisseph/ephe"
+# macOS: "/usr/local/share/sweph"
+# Linux: "/usr/local/share/sweph"
+
+[calculation]
+# Ayanamsa: 1 = Fagan-Bradley (default)
+ayanamsa = 1
+
+# House system: 'P' = Placidus (default)
+house_system = "P"
+
+[output]
+# Include seconds in positions (not yet implemented)
+show_seconds = false
+
+# Show applying/separating aspects (not yet implemented)
+show_aspect_direction = false

@@ -1,0 +1,452 @@
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+
+use astro_calc::{
+    calculate_chart, calculate_synastry_charts, calculate_transit_chart,
+    format_natal_chart, format_synastry_chart, format_transit_chart,
+    init_sweph, ChartInput,
+};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use regex::Regex;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PersonData {
+    name: String,
+    gender: String,
+    datetime: String, // ISO 8601 format
+    latitude: f64,
+    longitude: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DualNatalRequest {
+    person1: PersonData,
+    person2: PersonData,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SynastryRequest {
+    person1: PersonData,
+    person2: PersonData,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TransitRequest {
+    natal_person: PersonData,
+    transit_datetime: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct LocationResult {
+    name: String,
+    country: String,
+    admin1: String,
+    latitude: f64,
+    longitude: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct ChartResponse {
+    success: bool,
+    output: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct LocationResponse {
+    success: bool,
+    results: Vec<LocationResult>,
+    error: Option<String>,
+}
+
+// Helper function to validate timezone format in datetime string
+fn validate_timezone_format(datetime_str: &str, person_name: &str) -> Result<(), String> {
+    // Extract timezone part from datetime string (last 6 characters should be +/-HH:MM)
+    if datetime_str.len() < 6 {
+        return Err(format!(
+            "Invalid datetime format for {}. Expected format: YYYY-MM-DDTHH:MM:SS+HH:MM",
+            person_name
+        ));
+    }
+    
+    let potential_tz = &datetime_str[datetime_str.len() - 6..];
+    let tz_pattern = Regex::new(r"^[+-]\d{2}:\d{2}$").unwrap();
+    
+    if !tz_pattern.is_match(potential_tz) {
+        return Err(format!(
+            "Invalid timezone format for {}. Expected format: +HH:MM or -HH:MM (e.g., -05:00 for EST, +01:00 for CET). Received: {}",
+            person_name,
+            potential_tz
+        ));
+    }
+    
+    Ok(())
+}
+
+// Helper function to validate coordinates
+fn validate_coordinates(lat: f64, lon: f64, person_name: &str) -> Result<(), String> {
+    if lat < -90.0 || lat > 90.0 {
+        return Err(format!(
+            "Invalid latitude for {}: {}. Latitude must be between -90 and +90.",
+            person_name, lat
+        ));
+    }
+    
+    if lon < -180.0 || lon > 180.0 {
+        return Err(format!(
+            "Invalid longitude for {}: {}. Longitude must be between -180 and +180.",
+            person_name, lon
+        ));
+    }
+    
+    Ok(())
+}
+
+// Location search using GeoNames API
+#[tauri::command]
+async fn search_location(query: String) -> LocationResponse {
+    let url = format!(
+        "http://api.geonames.org/searchJSON?q={}&maxRows=10&username=demo",
+        urlencoding::encode(&query)
+    );
+
+    match reqwest::get(&url).await {
+        Ok(response) => {
+            match response.json::<serde_json::Value>().await {
+                Ok(data) => {
+                    let mut results = Vec::new();
+                    
+                    if let Some(geonames) = data["geonames"].as_array() {
+                        for location in geonames {
+                            if let (Some(name), Some(country), Some(lat), Some(lon)) = (
+                                location["name"].as_str(),
+                                location["countryName"].as_str(),
+                                location["lat"].as_str(),
+                                location["lng"].as_str(),
+                            ) {
+                                let admin1 = location["adminName1"].as_str().unwrap_or("");
+                                
+                                results.push(LocationResult {
+                                    name: name.to_string(),
+                                    country: country.to_string(),
+                                    admin1: admin1.to_string(),
+                                    latitude: lat.parse().unwrap_or(0.0),
+                                    longitude: lon.parse().unwrap_or(0.0),
+                                });
+                            }
+                        }
+                    }
+
+                    LocationResponse {
+                        success: true,
+                        results,
+                        error: None,
+                    }
+                }
+                Err(e) => LocationResponse {
+                    success: false,
+                    results: Vec::new(),
+                    error: Some(format!("Failed to parse response: {}", e)),
+                },
+            }
+        }
+        Err(e) => LocationResponse {
+            success: false,
+            results: Vec::new(),
+            error: Some(format!("Network error: {}", e)),
+        },
+    }
+}
+
+// Calculate two separate natal charts
+#[tauri::command]
+fn calculate_dual_natal(request: DualNatalRequest) -> ChartResponse {
+    let mut output = String::new();
+
+    // Validate Person 1 inputs
+    if let Err(e) = validate_timezone_format(&request.person1.datetime, &request.person1.name) {
+        return ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        };
+    }
+    
+    if let Err(e) = validate_coordinates(request.person1.latitude, request.person1.longitude, &request.person1.name) {
+        return ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        };
+    }
+
+    // Person 1
+    let dt1 = match DateTime::parse_from_rfc3339(&request.person1.datetime) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(e) => {
+            return ChartResponse {
+                success: false,
+                output: None,
+                error: Some(format!("Invalid datetime for {}: {}", request.person1.name, e)),
+            }
+        }
+    };
+
+    let input1 = ChartInput::new(dt1, request.person1.latitude, request.person1.longitude)
+        .with_name(request.person1.name.clone())
+        .with_gender(request.person1.gender.clone());
+
+    match calculate_chart(&input1) {
+        Ok(chart1) => {
+            output.push_str(&format!("═══════════════════════════════════════\n"));
+            output.push_str(&format!("{} ({})\n", request.person1.name, request.person1.gender));
+            output.push_str(&format!("═══════════════════════════════════════\n\n"));
+            output.push_str(&format_natal_chart(&chart1));
+            output.push_str("\n\n");
+        }
+        Err(e) => {
+            return ChartResponse {
+                success: false,
+                output: None,
+                error: Some(format!("Error calculating chart for {}: {}", request.person1.name, e)),
+            }
+        }
+    }
+
+    // Validate Person 2 inputs
+    if let Err(e) = validate_timezone_format(&request.person2.datetime, &request.person2.name) {
+        return ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        };
+    }
+    
+    if let Err(e) = validate_coordinates(request.person2.latitude, request.person2.longitude, &request.person2.name) {
+        return ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        };
+    }
+
+    // Person 2
+    let dt2 = match DateTime::parse_from_rfc3339(&request.person2.datetime) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(e) => {
+            return ChartResponse {
+                success: false,
+                output: None,
+                error: Some(format!("Invalid datetime for {}: {}", request.person2.name, e)),
+            }
+        }
+    };
+
+    let input2 = ChartInput::new(dt2, request.person2.latitude, request.person2.longitude)
+        .with_name(request.person2.name.clone())
+        .with_gender(request.person2.gender.clone());
+
+    match calculate_chart(&input2) {
+        Ok(chart2) => {
+            output.push_str(&format!("═══════════════════════════════════════\n"));
+            output.push_str(&format!("{} ({})\n", request.person2.name, request.person2.gender));
+            output.push_str(&format!("═══════════════════════════════════════\n\n"));
+            output.push_str(&format_natal_chart(&chart2));
+        }
+        Err(e) => {
+            return ChartResponse {
+                success: false,
+                output: None,
+                error: Some(format!("Error calculating chart for {}: {}", request.person2.name, e)),
+            }
+        }
+    }
+
+    ChartResponse {
+        success: true,
+        output: Some(output),
+        error: None,
+    }
+}
+
+#[tauri::command]
+fn calculate_synastry(request: SynastryRequest) -> ChartResponse {
+    // Validate Person 1 inputs
+    if let Err(e) = validate_timezone_format(&request.person1.datetime, &request.person1.name) {
+        return ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        };
+    }
+    
+    if let Err(e) = validate_coordinates(request.person1.latitude, request.person1.longitude, &request.person1.name) {
+        return ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        };
+    }
+    
+    // Validate Person 2 inputs
+    if let Err(e) = validate_timezone_format(&request.person2.datetime, &request.person2.name) {
+        return ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        };
+    }
+    
+    if let Err(e) = validate_coordinates(request.person2.latitude, request.person2.longitude, &request.person2.name) {
+        return ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        };
+    }
+
+    // Parse datetimes
+    let dt1 = match DateTime::parse_from_rfc3339(&request.person1.datetime) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(e) => {
+            return ChartResponse {
+                success: false,
+                output: None,
+                error: Some(format!("Invalid datetime for {}: {}", request.person1.name, e)),
+            }
+        }
+    };
+
+    let dt2 = match DateTime::parse_from_rfc3339(&request.person2.datetime) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(e) => {
+            return ChartResponse {
+                success: false,
+                output: None,
+                error: Some(format!("Invalid datetime for {}: {}", request.person2.name, e)),
+            }
+        }
+    };
+
+    // Create chart inputs
+    let input1 = ChartInput::new(dt1, request.person1.latitude, request.person1.longitude)
+        .with_name(request.person1.name.clone())
+        .with_gender(request.person1.gender.clone());
+    let input2 = ChartInput::new(dt2, request.person2.latitude, request.person2.longitude)
+        .with_name(request.person2.name.clone())
+        .with_gender(request.person2.gender.clone());
+
+    // Calculate synastry
+    match calculate_synastry_charts(&input1, &input2) {
+        Ok((chart1, chart2)) => {
+            let output = format_synastry_chart(
+                &chart1,
+                &request.person1.name,
+                &chart2,
+                &request.person2.name,
+            );
+            ChartResponse {
+                success: true,
+                output: Some(output),
+                error: None,
+            }
+        }
+        Err(e) => ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        },
+    }
+}
+
+#[tauri::command]
+fn calculate_transits(request: TransitRequest) -> ChartResponse {
+    // Validate natal person inputs
+    if let Err(e) = validate_timezone_format(&request.natal_person.datetime, &request.natal_person.name) {
+        return ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        };
+    }
+    
+    if let Err(e) = validate_coordinates(request.natal_person.latitude, request.natal_person.longitude, &request.natal_person.name) {
+        return ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        };
+    }
+    
+    // Validate transit datetime
+    if let Err(e) = validate_timezone_format(&request.transit_datetime, "transit date") {
+        return ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        };
+    }
+
+    // Parse datetimes
+    let natal_dt = match DateTime::parse_from_rfc3339(&request.natal_person.datetime) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(e) => {
+            return ChartResponse {
+                success: false,
+                output: None,
+                error: Some(format!("Invalid natal datetime: {}", e)),
+            }
+        }
+    };
+
+    let transit_dt = match DateTime::parse_from_rfc3339(&request.transit_datetime) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(e) => {
+            return ChartResponse {
+                success: false,
+                output: None,
+                error: Some(format!("Invalid transit datetime: {}", e)),
+            }
+        }
+    };
+
+    // Create chart input
+    let natal_input = ChartInput::new(natal_dt, request.natal_person.latitude, request.natal_person.longitude)
+        .with_name(request.natal_person.name.clone())
+        .with_gender(request.natal_person.gender.clone());
+
+    // Calculate transits
+    match calculate_transit_chart(&natal_input, &transit_dt) {
+        Ok((natal_chart, transit_chart)) => {
+            let output = format_transit_chart(&natal_chart, &transit_chart);
+            ChartResponse {
+                success: true,
+                output: Some(output),
+                error: None,
+            }
+        }
+        Err(e) => ChartResponse {
+            success: false,
+            output: None,
+            error: Some(e),
+        },
+    }
+}
+
+fn main() {
+    // Initialize Swiss Ephemeris
+    init_sweph();
+
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            calculate_dual_natal,
+            calculate_synastry,
+            calculate_transits,
+            search_location
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

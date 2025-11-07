@@ -1,0 +1,29 @@
+# Rust
+target/
+Cargo.lock
+
+# Tauri
+src-tauri/target/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Ephemeris data (large files)
+*.se1
+*.se2
+
+# Build outputs
+*.exe
+*.app
+*.dmg
+*.deb
+*.AppImage
+*.msi

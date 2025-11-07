@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astro Calculator - Fagan-Bradley Sidereal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .app-header {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .app-header h1 {
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+
+        .app-header .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .main-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Tab Navigation */
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-size: 16px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background: #e9ecef;
+        }
+
+        .tab.active {
+            background: white;
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+
+        /* Split Layout */
+        .content-wrapper {
+            display: flex;
+            height: calc(100vh - 200px);
+            min-height: 600px;
+        }
+
+        /* Left Panel - Inputs */
+        .input-panel {
+            width: 40%;
+            padding: 30px;
+            background: #f5f5f5;
+            overflow-y: auto;
+            border-right: 2px solid #e0e0e0;
+        }
+
+        /* Right Panel - Output */
+        .output-panel {
+            width: 60%;
+            padding: 30px;
+            background: white;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .person-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .person-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        input[type="time"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus,
+        input[type="date"]:focus,
+        input[type="time"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .gender-options {
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
+        }
+
+        .gender-options label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: normal;
+            cursor: pointer;
+        }
+
+        .hint-text {
+            font-size: 12px;
+            color: #999;
+            margin-top: 3px;
+        }
+
+        .calculate-btn {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .calculate-btn:hover {
+            background: #5568d3;
+        }
+
+        .calculate-btn:active {
+            transform: scale(0.98);
+        }
+
+        #outputText {
+            flex: 1;
+            width: 100%;
+            min-height: 400px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            resize: both;
+            overflow: auto;
+            background: #fafafa;
+        }
+
+        .copy-btn {
+            margin-top: 15px;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #5568d3;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .disabled-field {
+            background: #e9ecef !important;
+            cursor: not-allowed !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-header">
+        <h1>🌟 Astrological Chart Calculator</h1>
+        <p class="subtitle">Fagan-Bradley Sidereal • Placidus Houses</p>
+    </div>
+
+    <div class="main-container">
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('natal')">📊 Natal Chart</button>
+            <button class="tab" onclick="switchTab('synastry')">💑 Synastry</button>
+            <button class="tab" onclick="switchTab('transits')">🔄 Transits</button>
+        </div>
+
+        <div class="content-wrapper">
+            <!-- Left Panel: Inputs -->
+            <div class="input-panel">
+                <!-- Natal Tab Content -->
+                <div id="natal-inputs" class="tab-content active">
+                    <!-- Person 1 -->
+                    <div class="person-section">
+                        <h3>Person 1</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Name/Label</label>
+                                <input type="text" id="natal-p1-name" placeholder="Enter name">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Gender</label>
+                            <div class="gender-options">
+                                <label><input type="radio" name="natal-p1-gender" value="Male" checked> Male</label>
+                                <label><input type="radio" name="natal-p1-gender" value="Female"> Female</label>
+                                <label><input type="radio" name="natal-p1-gender" value="Other"> Other</label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Birth Date</label>
+                                <input type="date" id="natal-p1-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Birth Time</label>
+                                <input type="time" id="natal-p1-time">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="natal-p1-timezone" placeholder="e.g., -05:00">
+                            <p class="hint-text">Format: +/-HH:MM (e.g., -05:00 for EST)</p>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Latitude</label>
+                                <input type="number" id="natal-p1-lat" step="any" placeholder="40.7128">
+                                <p class="hint-text">North positive, South negative</p>
+                            </div>
+                            <div class="form-group">
+                                <label>Longitude</label>
+                                <input type="number" id="natal-p1-lon" step="any" placeholder="-74.0060">
+                                <p class="hint-text">East positive, West negative</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Person 2 -->
+                    <div class="person-section">
+                        <h3>Person 2</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Name/Label</label>
+                                <input type="text" id="natal-p2-name" placeholder="Enter name">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Gender</label>
+                            <div class="gender-options">
+                                <label><input type="radio" name="natal-p2-gender" value="Male"> Male</label>
+                                <label><input type="radio" name="natal-p2-gender" value="Female" checked> Female</label>
+                                <label><input type="radio" name="natal-p2-gender" value="Other"> Other</label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Birth Date</label>
+                                <input type="date" id="natal-p2-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Birth Time</label>
+                                <input type="time" id="natal-p2-time">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="natal-p2-timezone" placeholder="e.g., -05:00">
+                            <p class="hint-text">Format: +/-HH:MM</p>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Latitude</label>
+                                <input type="number" id="natal-p2-lat" step="any" placeholder="40.7128">
+                                <p class="hint-text">North positive, South negative</p>
+                            </div>
+                            <div class="form-group">
+                                <label>Longitude</label>
+                                <input type="number" id="natal-p2-lon" step="any" placeholder="-74.0060">
+                                <p class="hint-text">East positive, West negative</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="calculate-btn" onclick="calculateNatal()">Calculate Charts</button>
+                </div>
+
+                <!-- Synastry Tab Content -->
+                <div id="synastry-inputs" class="tab-content">
+                    <!-- Person 1 -->
+                    <div class="person-section">
+                        <h3>Person 1</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Name/Label</label>
+                                <input type="text" id="syn-p1-name" placeholder="Enter name">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Gender</label>
+                            <div class="gender-options">
+                                <label><input type="radio" name="syn-p1-gender" value="Male" checked> Male</label>
+                                <label><input type="radio" name="syn-p1-gender" value="Female"> Female</label>
+                                <label><input type="radio" name="syn-p1-gender" value="Other"> Other</label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Birth Date</label>
+                                <input type="date" id="syn-p1-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Birth Time</label>
+                                <input type="time" id="syn-p1-time">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="syn-p1-timezone" placeholder="e.g., -05:00">
+                            <p class="hint-text">Format: +/-HH:MM</p>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Latitude</label>
+                                <input type="number" id="syn-p1-lat" step="any" placeholder="40.7128">
+                            </div>
+                            <div class="form-group">
+                                <label>Longitude</label>
+                                <input type="number" id="syn-p1-lon" step="any" placeholder="-74.0060">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Person 2 -->
+                    <div class="person-section">
+                        <h3>Person 2</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Name/Label</label>
+                                <input type="text" id="syn-p2-name" placeholder="Enter name">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Gender</label>
+                            <div class="gender-options">
+                                <label><input type="radio" name="syn-p2-gender" value="Male"> Male</label>
+                                <label><input type="radio" name="syn-p2-gender" value="Female" checked> Female</label>
+                                <label><input type="radio" name="syn-p2-gender" value="Other"> Other</label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Birth Date</label>
+                                <input type="date" id="syn-p2-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Birth Time</label>
+                                <input type="time" id="syn-p2-time">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="syn-p2-timezone" placeholder="e.g., -05:00">
+                            <p class="hint-text">Format: +/-HH:MM</p>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Latitude</label>
+                                <input type="number" id="syn-p2-lat" step="any" placeholder="40.7128">
+                            </div>
+                            <div class="form-group">
+                                <label>Longitude</label>
+                                <input type="number" id="syn-p2-lon" step="any" placeholder="-74.0060">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="calculate-btn" onclick="calculateSynastry()">Calculate Synastry</button>
+                </div>
+
+                <!-- Transits Tab Content -->
+                <div id="transits-inputs" class="tab-content">
+                    <!-- Natal Person -->
+                    <div class="person-section">
+                        <h3>Natal Person</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Name/Label</label>
+                                <input type="text" id="trans-p1-name" placeholder="Enter name">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Gender</label>
+                            <div class="gender-options">
+                                <label><input type="radio" name="trans-p1-gender" value="Male" checked> Male</label>
+                                <label><input type="radio" name="trans-p1-gender" value="Female"> Female</label>
+                                <label><input type="radio" name="trans-p1-gender" value="Other"> Other</label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Birth Date</label>
+                                <input type="date" id="trans-p1-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Birth Time</label>
+                                <input type="time" id="trans-p1-time">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="trans-p1-timezone" placeholder="e.g., -05:00">
+                            <p class="hint-text">Format: +/-HH:MM</p>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Latitude</label>
+                                <input type="number" id="trans-p1-lat" step="any" placeholder="40.7128">
+                            </div>
+                            <div class="form-group">
+                                <label>Longitude</label>
+                                <input type="number" id="trans-p1-lon" step="any" placeholder="-74.0060">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transit Date -->
+                    <div class="person-section">
+                        <h3>Transit Date</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Name/Label</label>
+                                <input type="text" id="trans-p2-name" placeholder="Transit date label" class="disabled-field" disabled>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Date</label>
+                                <input type="date" id="trans-p2-date">
+                            </div>
+                            <div class="form-group">
+                                <label>Time</label>
+                                <input type="time" id="trans-p2-time">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Timezone</label>
+                            <input type="text" id="trans-p2-timezone" placeholder="e.g., -05:00">
+                            <p class="hint-text">Format: +/-HH:MM</p>
+                        </div>
+                    </div>
+
+                    <button class="calculate-btn" onclick="calculateTransits()">Calculate Transits</button>
+                </div>
+            </div>
+
+            <!-- Right Panel: Output -->
+            <div class="output-panel">
+                <textarea id="outputText" readonly placeholder="Chart output will appear here..."></textarea>
+                <button class="copy-btn" onclick="copyToClipboard()">📋 Copy to Clipboard</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        function switchTab(tab Name) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(tabName + '-inputs').classList.add('active');
+            
+            // Clear output
+            document.getElementById('outputText').value = '';
+        }
+
+        // Copy to clipboard
+        function copyToClipboard() {
+            const output = document.getElementById('outputText');
+            output.select();
+            document.execCommand('copy');
+            
+            // Visual feedback
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => btn.textContent = originalText, 2000);
+        }
+
+        // Calculate Natal Charts
+        function calculateNatal() {
+            const p1Data = {
+                name: document.getElementById('natal-p1-name').value || 'Person 1',
+                gender: document.querySelector('input[name="natal-p1-gender"]:checked').value,
+                date: document.getElementById('natal-p1-date').value,
+                time: document.getElementById('natal-p1-time').value,
+                timezone: document.getElementById('natal-p1-timezone').value,
+                latitude: parseFloat(document.getElementById('natal-p1-lat').value),
+                longitude: parseFloat(document.getElementById('natal-p1-lon').value)
+            };
+
+            const p2Data = {
+                name: document.getElementById('natal-p2-name').value || 'Person 2',
+                gender: document.querySelector('input[name="natal-p2-gender"]:checked').value,
+                date: document.getElementById('natal-p2-date').value,
+                time: document.getElementById('natal-p2-time').value,
+                timezone: document.getElementById('natal-p2-timezone').value,
+                latitude: parseFloat(document.getElementById('natal-p2-lat').value),
+                longitude: parseFloat(document.getElementById('natal-p2-lon').value)
+            };
+
+            // Call Tauri backend (placeholder - will implement next)
+            document.getElementById('outputText').value = 'Calculating natal charts...\n\nBackend integration coming next!';
+        }
+
+        // Calculate Synastry
+        function calculateSynastry() {
+            const p1Data = {
+                name: document.getElementById('syn-p1-name').value || 'Person 1',
+                gender: document.querySelector('input[name="syn-p1-gender"]:checked').value,
+                date: document.getElementById('syn-p1-date').value,
+                time: document.getElementById('syn-p1-time').value,
+                timezone: document.getElementById('syn-p1-timezone').value,
+                latitude: parseFloat(document.getElementById('syn-p1-lat').value),
+                longitude: parseFloat(document.getElementById('syn-p1-lon').value)
+            };
+
+            const p2Data = {
+                name: document.getElementById('syn-p2-name').value || 'Person 2',
+                gender: document.querySelector('input[name="syn-p2-gender"]:checked').value,
+                date: document.getElementById('syn-p2-date').value,
+                time: document.getElementById('syn-p2-time').value,
+                timezone: document.getElementById('syn-p2-timezone').value,
+                latitude: parseFloat(document.getElementById('syn-p2-lat').value),
+                longitude: parseFloat(document.getElementById('syn-p2-lon').value)
+            };
+
+            document.getElementById('outputText').value = 'Calculating synastry...\n\nBackend integration coming next!';
+        }
+
+        // Calculate Transits
+        function calculateTransits() {
+            const natalData = {
+                name: document.getElementById('trans-p1-name').value || 'Person',
+                gender: document.querySelector('input[name="trans-p1-gender"]:checked').value,
+                date: document.getElementById('trans-p1-date').value,
+                time: document.getElementById('trans-p1-time').value,
+                timezone: document.getElementById('trans-p1-timezone').value,
+                latitude: parseFloat(document.getElementById('trans-p1-lat').value),
+                longitude: parseFloat(document.getElementById('trans-p1-lon').value)
+            };
+
+            const transitData = {
+                date: document.getElementById('trans-p2-date').value,
+                time: document.getElementById('trans-p2-time').value,
+                timezone: document.getElementById('trans-p2-timezone').value
+            };
+
+            document.getElementById('outputText').value = 'Calculating transits...\n\nBackend integration coming next!';
+        }
+    </script>
+</body>
+</html>
